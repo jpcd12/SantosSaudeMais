@@ -1,7 +1,7 @@
-import axios from 'axios';
-import { Alert } from 'react-native';
+import { create } from 'axios';
+import { showGlobalAlert } from '../contexts/ThemeContext';
 
-const api = axios.create({
+const api = create({
   baseURL: 'http://10.0.2.2/santos-saude-api/api', 
   timeout: 10000, // Cancela a requisição automaticamente após 10 segundos
 });
@@ -19,8 +19,8 @@ api.interceptors.response.use(
     if (!error.response) {
       mensagemAmigavel = 'Você parece estar sem conexão com a internet ou o sistema está temporariamente indisponível. Verifique seu Wi-Fi ou dados móveis.';
       
-      // Dispara o alerta globalmente para o usuário
-      Alert.alert('Sem Conexão', mensagemAmigavel);
+      // Mostra o aviso usando o diálogo tematizado do app.
+      showGlobalAlert('Sem Conexão', mensagemAmigavel);
     } 
     // Se houve resposta de erro do PHP (ex: 400, 404, 500), pega a mensagem do back-end
     else if (error.response.data && (error.response.data.erro || error.response.data.mensagem)) {

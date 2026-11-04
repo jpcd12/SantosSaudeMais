@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { ThemeContext } from '../contexts/ThemeContext';
 
 const maskCPF = (t) => t.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').slice(0, 14);
 const maskNome = (t) => t.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
@@ -27,17 +29,20 @@ const validarCPF = (cpf) => {
 };
 
 export default function Cadastro({ navigation }) {
+  const { theme, showAlert } = useContext(ThemeContext);
+  const styles = getStyles(theme);
+
   const [form, setForm] = useState({ cpf: '', nome: '', dt_nasc: '', telefone: '', email: '', senha: '', confirmarSenha: '' });
 
   const handleCadastro = async () => {
-    if (form.senha !== form.confirmarSenha) return Alert.alert('Erro', 'As senhas não coincidem.');
-    if (!form.senha) return Alert.alert('Erro', 'A senha não pode estar vazia.');
-    if (!form.email) return Alert.alert('Erro', 'O e-mail é obrigatório para fins de recuperação de senha.');
+    if (form.senha !== form.confirmarSenha) return showAlert('Erro', 'As senhas não coincidem.');
+    if (!form.senha) return showAlert('Erro', 'A senha não pode estar vazia.');
+    if (!form.email) return showAlert('Erro', 'O e-mail é obrigatório para fins de recuperação de senha.');
 
     const cpfLimpo = form.cpf.replace(/\D/g, '');
-    if (!validarCPF(cpfLimpo)) return Alert.alert('Erro', 'CPF inválido.');
+    if (!validarCPF(cpfLimpo)) return showAlert('Erro', 'CPF inválido.');
     
-    if (form.dt_nasc.length !== 10) return Alert.alert('Erro', 'Data de nascimento incompleta.');
+    if (form.dt_nasc.length !== 10) return showAlert('Erro', 'Data de nascimento incompleta.');
     const [dia, mes, ano] = form.dt_nasc.split('/');
     const dataMySQL = `${ano}-${mes}-${dia}`;
     
@@ -52,33 +57,47 @@ export default function Cadastro({ navigation }) {
         email: form.email.trim(),
         senha: form.senha
       });
-      Alert.alert('Sucesso', response.data.mensagem, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      showAlert('Sucesso', response.data.mensagem, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (error) {
-      Alert.alert('Erro', error.response?.data?.mensagem || 'Falha ao conectar.');
+      showAlert('Erro', error.response?.data?.mensagem || 'Falha ao conectar.');
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <TextInput style={styles.input} placeholder="CPF" keyboardType="numeric" value={form.cpf} onChangeText={t => setForm({...form, cpf: maskCPF(t)})} />
-      <TextInput style={styles.input} placeholder="Nome Completo" value={form.nome} onChangeText={t => setForm({...form, nome: maskNome(t)})} />
-      <TextInput style={styles.input} placeholder="Data de Nascimento (DD/MM/AAAA)" keyboardType="numeric" value={form.dt_nasc} onChangeText={t => setForm({...form, dt_nasc: maskData(t)})} />
-      <TextInput style={styles.input} placeholder="Telefone" keyboardType="numeric" value={form.telefone} onChangeText={t => setForm({...form, telefone: maskTelefone(t)})} />
+      <Ionicons name="person-add-outline" size={60} color={theme.primary} style={styles.accountIcon} />
+      <Text style={styles.welcomeTitle}>Boas-vindas ao Santos Saúde+</Text>
+      <Text style={styles.instructions}>Preencha o formulário abaixo para criar sua conta.</Text>
+      <Text style={styles.inputLabel} nativeID="cadastro-cpf-label">CPF</Text>
+      <TextInput nativeID="cadastro-cpf" accessibilityLabel="CPF" accessibilityLabelledBy="cadastro-cpf-label" style={styles.input} placeholder="000.000.000-00" placeholderTextColor={theme.textSecondary} keyboardType="numeric" value={form.cpf} onChangeText={t => setForm({...form, cpf: maskCPF(t)})} />
+      <Text style={styles.inputLabel} nativeID="cadastro-nome-label">Nome completo</Text>
+      <TextInput nativeID="cadastro-nome" accessibilityLabel="Nome completo" accessibilityLabelledBy="cadastro-nome-label" style={styles.input} placeholder="Ex.: Maria da Silva" placeholderTextColor={theme.textSecondary} value={form.nome} onChangeText={t => setForm({...form, nome: maskNome(t)})} />
+      <Text style={styles.inputLabel} nativeID="cadastro-nascimento-label">Data de nascimento</Text>
+      <TextInput nativeID="cadastro-nascimento" accessibilityLabel="Data de nascimento" accessibilityLabelledBy="cadastro-nascimento-label" style={styles.input} placeholder="DD/MM/AAAA" placeholderTextColor={theme.textSecondary} keyboardType="numeric" value={form.dt_nasc} onChangeText={t => setForm({...form, dt_nasc: maskData(t)})} />
+      <Text style={styles.inputLabel} nativeID="cadastro-telefone-label">Telefone</Text>
+      <TextInput nativeID="cadastro-telefone" accessibilityLabel="Telefone" accessibilityLabelledBy="cadastro-telefone-label" style={styles.input} placeholder="(00) 00000-0000" placeholderTextColor={theme.textSecondary} keyboardType="numeric" value={form.telefone} onChangeText={t => setForm({...form, telefone: maskTelefone(t)})} />
       
-      <TextInput style={styles.input} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={t => setForm({...form, email: t})} />
+      <Text style={styles.inputLabel} nativeID="cadastro-email-label">E-mail</Text>
+      <TextInput nativeID="cadastro-email" accessibilityLabel="E-mail" accessibilityLabelledBy="cadastro-email-label" style={styles.input} placeholder="exemplo@email.com" placeholderTextColor={theme.textSecondary} keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={t => setForm({...form, email: t})} />
       
-      <TextInput style={styles.input} placeholder="Senha" secureTextEntry value={form.senha} onChangeText={t => setForm({...form, senha: t})} />
-      <TextInput style={styles.input} placeholder="Confirmar Senha" secureTextEntry value={form.confirmarSenha} onChangeText={t => setForm({...form, confirmarSenha: t})} />
-      <TouchableOpacity style={styles.button} onPress={handleCadastro}>
+      <Text style={styles.inputLabel} nativeID="cadastro-senha-label">Senha</Text>
+      <TextInput nativeID="cadastro-senha" accessibilityLabel="Senha" accessibilityLabelledBy="cadastro-senha-label" style={styles.input} placeholder="Digite sua senha" placeholderTextColor={theme.textSecondary} secureTextEntry value={form.senha} onChangeText={t => setForm({...form, senha: t})} />
+      <Text style={styles.inputLabel} nativeID="cadastro-confirmar-senha-label">Confirmar senha</Text>
+      <TextInput nativeID="cadastro-confirmar-senha" accessibilityLabel="Confirmar senha" accessibilityLabelledBy="cadastro-confirmar-senha-label" style={styles.input} placeholder="Repita sua senha" placeholderTextColor={theme.textSecondary} secureTextEntry value={form.confirmarSenha} onChangeText={t => setForm({...form, confirmarSenha: t})} />
+      <TouchableOpacity style={styles.button} onPress={handleCadastro} accessibilityRole="button">
         <Text style={styles.buttonText}>Cadastrar</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 15, borderRadius: 5 },
-  button: { backgroundColor: '#28a745', padding: 15, borderRadius: 5, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: 'bold' }
+const getStyles = (theme) => StyleSheet.create({
+  container: { flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background },
+  accountIcon: { alignSelf: 'center', marginBottom: 12 },
+  welcomeTitle: { color: theme.text, fontSize: 22, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  instructions: { fontSize: 15, color: theme.textSecondary, marginBottom: 20, lineHeight: 22, textAlign: 'center' },
+  inputLabel: { color: theme.text, fontSize: 14, fontWeight: '600', marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: theme.border, padding: 10, marginBottom: 15, borderRadius: 5, color: theme.text, backgroundColor: theme.card },
+  button: { backgroundColor: theme.successAction, padding: 15, borderRadius: 5, alignItems: 'center' },
+  buttonText: { color: theme.onAction, fontWeight: 'bold' }
 });

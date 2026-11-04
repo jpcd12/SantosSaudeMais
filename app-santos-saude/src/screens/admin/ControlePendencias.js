@@ -1,21 +1,19 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useContext } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
+import { ThemeContext } from '../../contexts/ThemeContext';
 
 export default function ControlePendencias({ navigation }) {
+  const { theme, showAlert } = useContext(ThemeContext);
+  const styles = getStyles(theme);
+
   const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      carregarPacientes();
-    }, [])
-  );
-
-  const carregarPacientes = async () => {
+  const carregarPacientes = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get('/admin/listar_pacientes.php');
@@ -24,12 +22,18 @@ export default function ControlePendencias({ navigation }) {
       } else {
         setPacientes([]);
       }
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao buscar pacientes.');
+    } catch (_error) {
+      showAlert('Erro', 'Falha ao buscar pacientes.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showAlert]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarPacientes();
+    }, [carregarPacientes])
+  );
 
   const formatarDataBr = (dataDb) => {
     if (!dataDb) return '';
@@ -52,33 +56,34 @@ export default function ControlePendencias({ navigation }) {
       })}
     >
       <View style={styles.cardHeader}>
-        <Ionicons name="person-circle-outline" size={40} color="#007BFF" />
+        <Ionicons name="person-circle-outline" size={40} color={theme.primary} />
         <View style={styles.headerText}>
           <Text style={styles.pacienteNome}>{item.nome}</Text>
           <Text style={styles.pacienteInfo}>{formatarDataBr(item.dt_nasc)}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={24} color="#ccc" />
+        <Ionicons name="chevron-forward" size={24} color={theme.icon} />
       </View>
     </TouchableOpacity>
   );
 
   if (loading && pacientes.length === 0) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#007BFF" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color={theme.primary} /></View>;
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.searchBox}>
-        <Ionicons name="search" size={20} color="#999" />
+        <Ionicons name="search" size={20} color={theme.icon} />
         <TextInput 
           style={styles.searchInput}
           placeholder="Buscar por nome ou data (DD/MM/AAAA)..."
+          placeholderTextColor={theme.textSecondary}
           value={busca}
           onChangeText={setBusca}
         />
         {busca !== '' && (
           <TouchableOpacity onPress={() => setBusca('')}>
-            <Ionicons name="close-circle" size={20} color="#999" />
+            <Ionicons name="close-circle" size={20} color={theme.icon} />
           </TouchableOpacity>
         )}
       </View>
@@ -94,15 +99,15 @@ export default function ControlePendencias({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', margin: 15, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, elevation: 2 },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 16, color: '#333' },
-  emptyText: { textAlign: 'center', marginTop: 40, color: '#666', fontSize: 16 },
-  card: { backgroundColor: '#fff', marginHorizontal: 15, marginBottom: 12, padding: 15, borderRadius: 10, elevation: 2 },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, margin: 15, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, elevation: 2, borderWidth: 1, borderColor: theme.border },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 16, color: theme.text },
+  emptyText: { textAlign: 'center', marginTop: 40, color: theme.textSecondary, fontSize: 16 },
+  card: { backgroundColor: theme.card, marginHorizontal: 15, marginBottom: 12, padding: 15, borderRadius: 10, elevation: 2, borderWidth: 1, borderColor: theme.border },
   cardHeader: { flexDirection: 'row', alignItems: 'center' },
   headerText: { marginLeft: 12, flex: 1 },
-  pacienteNome: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  pacienteInfo: { fontSize: 14, color: '#666', marginTop: 2 },
+  pacienteNome: { fontSize: 18, fontWeight: 'bold', color: theme.text },
+  pacienteInfo: { fontSize: 14, color: theme.textSecondary, marginTop: 2 },
 });

@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useContext, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { ThemeContext } from '../contexts/ThemeContext';
 
 export default function AgendarPendencia({ navigation }) {
+  const { theme, showAlert } = useContext(ThemeContext);
+  const styles = getStyles(theme);
+
   const [pendencias, setPendencias] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    carregarPendencias();
-  }, []);
-
-  const carregarPendencias = async () => {
+  const carregarPendencias = useCallback(async () => {
     try {
       const tokenCpf = await AsyncStorage.getItem('userToken');
       if (!tokenCpf) return;
@@ -22,29 +23,38 @@ export default function AgendarPendencia({ navigation }) {
       if (response.data && response.data.sucesso) {
         setPendencias(response.data.pendencias);
       } else {
-        Alert.alert('Aviso', response.data.erro || 'Não foi possível carregar os encaminhamentos.');
+        showAlert('Aviso', response.data.erro || 'Não foi possível carregar os encaminhamentos.');
       }
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao conectar com o servidor.');
+      showAlert('Erro', 'Falha ao conectar com o servidor.');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [showAlert]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarPendencias();
+    }, [carregarPendencias])
+  );
 
   const renderItem = ({ item }) => {
     const isConsulta = item.servico_tipo === 'Consulta';
-    const corTema = isConsulta ? '#007BFF' : '#20c997';
+    const corTema = isConsulta ? theme.primary : theme.success;
     const iconeTema = isConsulta ? 'medkit-outline' : 'flask-outline';
     
     const temVaga = item.vagas_disponiveis > 0;
-    const corStatus = temVaga ? '#28a745' : '#dc3545';
+    const corStatus = temVaga ? theme.success : theme.danger;
     const textoStatus = temVaga ? 'Horários disponíveis' : 'Nenhum horário disponível';
 
     return (
       <TouchableOpacity 
           style={[styles.card, { opacity: temVaga ? 1 : 0.6 }]}
           disabled={!temVaga}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.servico_nome}, ${item.servico_tipo}. ${textoStatus}`}
+          accessibilityHint={temVaga ? 'Abre a escolha de data e horário.' : undefined}
           onPress={() => {
             navigation.navigate('SelecaoHorario', { 
               servico_id: item.servico_id, 
@@ -64,7 +74,7 @@ export default function AgendarPendencia({ navigation }) {
           </View>
         </View>
         <Text style={[styles.status, { color: corStatus }]}>{textoStatus}</Text>
-        {temVaga && <Ionicons name="chevron-forward-outline" size={20} color="#999" style={styles.arrow} />}
+        {temVaga && <Ionicons name="chevron-forward-outline" size={20} color={theme.textSecondary} style={styles.arrow} />}
       </TouchableOpacity>
     );
   };
@@ -72,7 +82,7 @@ export default function AgendarPendencia({ navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -94,21 +104,21 @@ export default function AgendarPendencia({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 20 },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background, padding: 20 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
+  title: { fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 20 },
   card: { 
-    backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 15,
+    backgroundColor: theme.card, padding: 15, borderRadius: 10, marginBottom: 15,
     elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 1 },
-    justifyContent: 'center'
+    justifyContent: 'center', borderWidth: 1, borderColor: theme.border
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   iconContainer: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   textContainer: { marginLeft: 12, flex: 1 },
-  servicoNome: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  servicoNome: { fontSize: 18, fontWeight: 'bold', color: theme.text },
   servicoTipo: { fontSize: 14, fontWeight: 'bold' },
   status: { fontSize: 13, fontWeight: '500', marginTop: 4 },
   arrow: { position: 'absolute', right: 15 },
-  emptyText: { fontSize: 16, color: '#666', textAlign: 'center', marginTop: 50 }
+  emptyText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginTop: 50 }
 });

@@ -1,10 +1,14 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useCallback, useContext } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
+import { ThemeContext } from '../../contexts/ThemeContext';
 
 export default function PendenciasPaciente({ route, navigation }) {
+  const { theme, showAlert } = useContext(ThemeContext);
+  const styles = getStyles(theme);
+
   const { paciente_id, paciente_nome, paciente_dt_nasc } = route.params;
   const [pendencias, setPendencias] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,13 +17,7 @@ export default function PendenciasPaciente({ route, navigation }) {
   const [modalExclusaoVisivel, setModalExclusaoVisivel] = useState(false);
   const [pendenciaSelecionada, setPendenciaSelecionada] = useState(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      carregarPendencias();
-    }, [])
-  );
-
-  const carregarPendencias = async () => {
+  const carregarPendencias = useCallback(async () => {
     try {
       const response = await api.get(`/admin/listar_pendencias_paciente.php?paciente_id=${paciente_id}`);
       if (response.data && response.data.sucesso) {
@@ -27,12 +25,18 @@ export default function PendenciasPaciente({ route, navigation }) {
       } else {
         setPendencias([]);
       }
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao buscar pendências.');
+    } catch (_error) {
+      showAlert('Erro', 'Falha ao buscar pendências.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [paciente_id, showAlert]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarPendencias();
+    }, [carregarPendencias])
+  );
 
   const formatarDataBr = (dataDb) => {
     if (!dataDb) return '';
@@ -56,10 +60,10 @@ export default function PendenciasPaciente({ route, navigation }) {
       if (response.data && response.data.sucesso) {
         carregarPendencias();
       } else {
-        Alert.alert('Erro', response.data.erro);
+        showAlert('Erro', response.data.erro);
       }
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao excluir.');
+    } catch (_error) {
+      showAlert('Erro', 'Falha ao excluir.');
     }
   };
 
@@ -67,15 +71,14 @@ export default function PendenciasPaciente({ route, navigation }) {
     const statusReal = item.status;
     const isAgendado = statusReal === 'Agendado';
     
-    // Máscara Visual Específica para esta tela
     let statusExibicao = statusReal || 'Pendente'; 
-    let corStatus = '#6c757d'; // Cinza padrão
+    let corStatus = theme.textSecondary; 
 
     if (!statusReal || statusReal === 'Pendente' || statusReal === 'Aguardando') {
       statusExibicao = 'Disponível';
-      corStatus = '#ffc107'; // Amarelo
+      corStatus = '#ffc107'; 
     } else if (isAgendado) {
-      corStatus = '#28a745'; // Verde
+      corStatus = theme.success; 
     }
 
     return (
@@ -84,21 +87,21 @@ export default function PendenciasPaciente({ route, navigation }) {
           <Text style={styles.servicoNome}>{item.servico_nome}</Text>
           <Text style={styles.servicoTipo}>{item.servico_tipo}</Text>
           <View style={[styles.badge, { backgroundColor: corStatus }]}>
-            <Text style={styles.badgeText}>{statusExibicao}</Text>
+            <Text style={[styles.badgeText, corStatus === '#ffc107' && styles.badgeWarningText]}>{statusExibicao}</Text>
           </View>
         </View>
         <TouchableOpacity 
           style={[styles.btnLixeira, isAgendado && styles.btnLixeiraDesativada]} 
           onPress={() => handleExcluirPress(item)}
         >
-          <Ionicons name="trash" size={24} color={isAgendado ? "#aaa" : "#dc3545"} />
+          <Ionicons name="trash" size={24} color={isAgendado ? theme.textSecondary : theme.danger} />
         </TouchableOpacity>
       </View>
     );
   };
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#007BFF" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color={theme.primary} /></View>;
   }
 
   return (
@@ -120,7 +123,7 @@ export default function PendenciasPaciente({ route, navigation }) {
         style={styles.fab} 
         onPress={() => navigation.navigate('AdicionarPendencia', { paciente_id, paciente_nome })}
       >
-        <Ionicons name="add" size={30} color="#fff" />
+        <Ionicons name="add" size={30} color={theme.onAction} />
       </TouchableOpacity>
 
       <Modal visible={modalAvisoVisivel} transparent={true} animationType="fade">
@@ -140,7 +143,7 @@ export default function PendenciasPaciente({ route, navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Remover Pendência</Text>
-            <Text style={styles.modalText}>Tem certeza que deseja remover o encaminhamento de "{pendenciaSelecionada?.servico_nome}"?</Text>
+            <Text style={styles.modalText}>Tem a certeza que deseja remover o encaminhamento de &quot;{pendenciaSelecionada?.servico_nome}&quot;?</Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalExclusaoVisivel(false)}>
                 <Text style={styles.btnCancelarTexto}>CANCELAR</Text>
@@ -156,30 +159,31 @@ export default function PendenciasPaciente({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#ddd', marginBottom: 10 },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#333' },
-  headerSubtitle: { fontSize: 14, color: '#666', marginTop: 4 },
-  emptyText: { textAlign: 'center', marginTop: 40, color: '#666', fontSize: 16 },
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 15, marginBottom: 12, padding: 15, borderRadius: 10, elevation: 2 },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
+  header: { padding: 20, backgroundColor: theme.card, borderBottomWidth: 1, borderBottomColor: theme.border, marginBottom: 10 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: theme.text },
+  headerSubtitle: { fontSize: 14, color: theme.textSecondary, marginTop: 4 },
+  emptyText: { textAlign: 'center', marginTop: 40, color: theme.textSecondary, fontSize: 16 },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, marginHorizontal: 15, marginBottom: 12, padding: 15, borderRadius: 10, elevation: 2, borderWidth: 1, borderColor: theme.border },
   cardInfo: { flex: 1 },
-  servicoNome: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  servicoTipo: { fontSize: 14, color: '#666', marginVertical: 4 },
+  servicoNome: { fontSize: 18, fontWeight: 'bold', color: theme.text },
+  servicoTipo: { fontSize: 14, color: theme.textSecondary, marginVertical: 4 },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 4 },
-  badgeText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  badgeText: { color: theme.onStatus, fontWeight: 'bold', fontSize: 12 },
+  badgeWarningText: { color: '#252525' },
   btnLixeira: { padding: 10 },
   btnLixeiraDesativada: { opacity: 0.3 },
-  fab: { position: 'absolute', right: 20, bottom: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#007BFF', justifyContent: 'center', alignItems: 'center', elevation: 5 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { backgroundColor: '#fff', padding: 25, borderRadius: 10, width: '85%' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 15, textAlign: 'center' },
-  modalText: { fontSize: 16, color: '#666', marginBottom: 25, textAlign: 'center', lineHeight: 22 },
+  fab: { position: 'absolute', right: 20, bottom: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: theme.primaryAction, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { backgroundColor: theme.card, padding: 25, borderRadius: 10, width: '85%', borderWidth: 1, borderColor: theme.border },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 15, textAlign: 'center' },
+  modalText: { fontSize: 16, color: theme.textSecondary, marginBottom: 25, textAlign: 'center', lineHeight: 22 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  btnOk: { padding: 12, borderRadius: 8, backgroundColor: '#007BFF', alignItems: 'center', width: '100%' },
-  btnCancelar: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: '#f0f0f0', alignItems: 'center', marginRight: 10 },
-  btnCancelarTexto: { color: '#333', fontWeight: 'bold', fontSize: 14 },
-  btnConfirmarExclusao: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: '#dc3545', alignItems: 'center', marginLeft: 10 },
-  btnTextoBranco: { color: '#fff', fontWeight: 'bold', fontSize: 14 }
+  btnOk: { padding: 12, borderRadius: 8, backgroundColor: theme.primaryAction, alignItems: 'center', width: '100%' },
+  btnCancelar: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.background, alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: theme.border },
+  btnCancelarTexto: { color: theme.text, fontWeight: 'bold', fontSize: 14 },
+  btnConfirmarExclusao: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.dangerAction, alignItems: 'center', marginLeft: 10 },
+  btnTextoBranco: { color: theme.onAction, fontWeight: 'bold', fontSize: 14 }
 });

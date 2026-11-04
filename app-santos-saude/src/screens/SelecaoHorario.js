@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal } from 'react-native';
+import React, { useState, useContext, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import api from '../services/api';
+import { ThemeContext } from '../contexts/ThemeContext';
 
 export default function SelecaoHorario({ route, navigation }) {
+  const { theme, showAlert } = useContext(ThemeContext);
+  const styles = getStyles(theme);
+
   const { servico_id, pendencia_id, servico_nome, servico_tipo } = route.params;
   const [horariosAgrupados, setHorariosAgrupados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,35 +23,15 @@ export default function SelecaoHorario({ route, navigation }) {
   const [slotSelecionado, setSlotSelecionado] = useState(null);
 
   const isConsulta = servico_tipo === 'Consulta';
-  const corTema = isConsulta ? '#007BFF' : '#20c997';
+  const corTema = isConsulta ? theme.primary : theme.success;
   const iconeTema = isConsulta ? 'medkit-outline' : 'flask-outline';
 
-  useEffect(() => {
-    carregarHorarios();
-  }, []);
-
-  const carregarHorarios = async () => {
-    try {
-      const response = await api.get(`/paciente/agenda.php?servico_id=${servico_id}`);
-      if (response.data && response.data.sucesso) {
-        agruparHorarios(response.data.horarios);
-      } else {
-        Alert.alert('Aviso', response.data.erro || 'Nenhum horário disponível.');
-      }
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao buscar horários.');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const agruparHorarios = (lista) => {
+  const agruparHorarios = useCallback((lista) => {
     const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
     const grupos = {};
 
     lista.forEach(item => {
-      const [dataParte, horaParte] = item.data_hora.split(' ');
+      const [dataParte] = item.data_hora.split(' ');
       const [ano, mes, dia] = dataParte.split('-');
       
       const dataObj = new Date(Number(ano), Number(mes) - 1, Number(dia));
@@ -65,7 +50,29 @@ export default function SelecaoHorario({ route, navigation }) {
     }));
 
     setHorariosAgrupados(arrayAgrupado);
-  };
+  }, []);
+
+  const carregarHorarios = useCallback(async () => {
+    try {
+      const response = await api.get(`/paciente/agenda.php?servico_id=${servico_id}`);
+      if (response.data && response.data.sucesso) {
+        agruparHorarios(response.data.horarios);
+      } else {
+        showAlert('Aviso', response.data.erro || 'Nenhum horário disponível.');
+      }
+    } catch (error) {
+      showAlert('Erro', 'Falha ao buscar horários.');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [agruparHorarios, servico_id, showAlert]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarHorarios();
+    }, [carregarHorarios])
+  );
 
   const abrirModalConfirmacao = (item) => {
     setSlotSelecionado(item);
@@ -122,11 +129,11 @@ export default function SelecaoHorario({ route, navigation }) {
           }
         }
       } else {
-        Alert.alert('Erro', response.data.erro);
+        showAlert('Erro', response.data.erro);
       }
     } catch (error) {
       const mensagemErro = error.response?.data?.erro || `Erro Técnico: ${error.message}`;
-      Alert.alert('Erro no Servidor', mensagemErro);
+      showAlert('Erro no Servidor', mensagemErro);
       console.error("Detalhes:", error);
     }
   };
@@ -144,12 +151,15 @@ export default function SelecaoHorario({ route, navigation }) {
           style={styles.diaHeader}
           onPress={() => toggleExpand(item.dataDescricao)}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${isExpanded ? 'Ocultar' : 'Mostrar'} horários de ${item.dataDescricao}`}
+          accessibilityState={{ expanded: isExpanded }}
         >
           <View style={styles.diaTitleInfo}>
-            <Ionicons name="calendar-outline" size={24} color="#007BFF" />
+            <Ionicons name="calendar-outline" size={24} color={theme.primary} />
             <Text style={styles.diaTexto}>{item.dataDescricao}</Text>
           </View>
-          <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color="#999" />
+          <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textSecondary} />
         </TouchableOpacity>
 
         {isExpanded && (
@@ -161,6 +171,9 @@ export default function SelecaoHorario({ route, navigation }) {
                   key={horario.slot_id.toString()} 
                   style={styles.horarioBadge}
                   onPress={() => abrirModalConfirmacao(horario)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Selecionar ${horaFormatada} em ${item.dataDescricao}`}
+                  accessibilityHint="Abre a confirmação do agendamento."
                 >
                   <Text style={styles.horarioBadgeText}>{horaFormatada}</Text>
                 </TouchableOpacity>
@@ -175,14 +188,14 @@ export default function SelecaoHorario({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
 
   const formatarDataCompleta = (dataHoraString) => {
     const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-    const [dataParte, horaParte] = dataHoraString.split(' ');
+    const [dataParte] = dataHoraString.split(' ');
     const [ano, mes, dia] = dataParte.split('-');
     const dataObj = new Date(Number(ano), Number(mes) - 1, Number(dia));
     const diaSemana = diasSemana[dataObj.getDay()];
@@ -214,7 +227,7 @@ export default function SelecaoHorario({ route, navigation }) {
         />
       )}
 
-      {/* Modal de Confirmação Corrigido */}
+      {/* Modal de Confirmação */}
       <Modal visible={modalConfirmacao} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -226,13 +239,13 @@ export default function SelecaoHorario({ route, navigation }) {
               <View style={styles.modalDateBox}>
                 <View style={styles.modalDateContent}>
                   <View style={styles.modalDateRow}>
-                    <Ionicons name="calendar-outline" size={20} color="#007BFF" />
+                    <Ionicons name="calendar-outline" size={20} color={theme.primary} />
                     <Text style={styles.modalDateText}>
                       {formatarDataCompleta(slotSelecionado.data_hora)}
                     </Text>
                   </View>
                   <View style={styles.modalDateRow}>
-                    <Ionicons name="time-outline" size={20} color="#007BFF" />
+                    <Ionicons name="time-outline" size={20} color={theme.primary} />
                     <Text style={styles.modalDateText}>
                       {slotSelecionado.data_hora.split(' ')[1].substring(0, 5)}
                     </Text>
@@ -245,6 +258,7 @@ export default function SelecaoHorario({ route, navigation }) {
               <TouchableOpacity 
                 style={styles.btnCancelarAcao} 
                 onPress={() => setModalConfirmacao(false)}
+                accessibilityRole="button"
               >
                 <Text style={styles.btnTextoBranco}>Cancelar</Text>
               </TouchableOpacity>
@@ -252,6 +266,8 @@ export default function SelecaoHorario({ route, navigation }) {
               <TouchableOpacity 
                 style={styles.btnConfirmarAcao} 
                 onPress={confirmarAgendamento}
+                accessibilityRole="button"
+                accessibilityLabel={`Confirmar agendamento de ${servico_nome}`}
               >
                 <Text style={styles.btnTextoBranco}>Confirmar</Text>
               </TouchableOpacity>
@@ -264,7 +280,7 @@ export default function SelecaoHorario({ route, navigation }) {
       <Modal visible={modalProtocolo} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Ionicons name="checkmark-circle" size={70} color="#28a745" style={{ textAlign: 'center', marginBottom: 10 }} />
+            <Ionicons name="checkmark-circle" size={70} color={theme.success} style={{ textAlign: 'center', marginBottom: 10 }} />
             <Text style={styles.modalTitle}>Agendamento Confirmado!</Text>
             
             <View style={styles.protocoloBox}>
@@ -278,6 +294,7 @@ export default function SelecaoHorario({ route, navigation }) {
                 setModalProtocolo(false);
                 navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
               }}
+              accessibilityRole="button"
             >
               <Text style={styles.btnOkText}>Entendi, Voltar ao Início</Text>
             </TouchableOpacity>
@@ -288,47 +305,47 @@ export default function SelecaoHorario({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background, padding: 20 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   
   headerInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   serviceHeader: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#333', marginLeft: 10, flexShrink: 1 },
+  title: { fontSize: 22, fontWeight: 'bold', color: theme.text, marginLeft: 10, flexShrink: 1 },
   badgeTipo: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 15, marginLeft: 10 },
   badgeTipoText: { fontSize: 13, fontWeight: 'bold' },
   
-  subtitle: { fontSize: 15, color: '#666', marginBottom: 20, lineHeight: 22 },
+  subtitle: { fontSize: 15, color: theme.textSecondary, marginBottom: 20, lineHeight: 22 },
   
-  cardContainer: { backgroundColor: '#fff', borderRadius: 10, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 1 }, overflow: 'hidden' },
-  diaHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, backgroundColor: '#fff' },
+  cardContainer: { backgroundColor: theme.card, borderRadius: 10, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 1 }, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
+  diaHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, backgroundColor: theme.card },
   diaTitleInfo: { flexDirection: 'row', alignItems: 'center' },
-  diaTexto: { fontSize: 16, color: '#333', marginLeft: 12, fontWeight: '600' },
+  diaTexto: { fontSize: 16, color: theme.text, marginLeft: 12, fontWeight: '600' },
   
-  horariosGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, paddingBottom: 15, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 15 },
-  horarioBadge: { backgroundColor: '#e9ecef', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, margin: 5, minWidth: 70, alignItems: 'center' },
-  horarioBadgeText: { fontSize: 15, fontWeight: 'bold', color: '#007BFF' },
+  horariosGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, paddingBottom: 15, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 15 },
+  horarioBadge: { backgroundColor: theme.background, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, margin: 5, minWidth: 70, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  horarioBadgeText: { fontSize: 15, fontWeight: 'bold', color: theme.primary },
   
-  emptyText: { fontSize: 16, color: '#666', textAlign: 'center', marginTop: 50 },
+  emptyText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginTop: 50 },
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { backgroundColor: '#fff', padding: 25, borderRadius: 15, width: '85%', elevation: 5 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', textAlign: 'center', marginBottom: 15 },
-  modalText: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 5 },
+  modalContainer: { backgroundColor: theme.card, padding: 25, borderRadius: 15, width: '85%', elevation: 5, borderWidth: 1, borderColor: theme.border },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.text, textAlign: 'center', marginBottom: 15 },
+  modalText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 5 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
   
-  modalDateBox: { backgroundColor: '#f8f9fa', paddingVertical: 15, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef', marginVertical: 15, width: '100%', alignItems: 'center' },
+  modalDateBox: { backgroundColor: theme.background, paddingVertical: 15, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: theme.border, marginVertical: 15, width: '100%', alignItems: 'center' },
   modalDateContent: { width: 220 },
   modalDateRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
-  modalDateText: { fontSize: 16, color: '#333', marginLeft: 10, fontWeight: 'bold' },
+  modalDateText: { fontSize: 16, color: theme.text, marginLeft: 10, fontWeight: 'bold' },
   
-  btnCancelarAcao: { padding: 12, borderRadius: 8, backgroundColor: '#dc3545', flex: 1, marginRight: 10, alignItems: 'center' },
-  btnConfirmarAcao: { padding: 12, borderRadius: 8, backgroundColor: '#28a745', flex: 1, marginLeft: 10, alignItems: 'center' },
-  btnTextoBranco: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  btnCancelarAcao: { padding: 12, borderRadius: 8, backgroundColor: theme.dangerAction, flex: 1, marginRight: 10, alignItems: 'center' },
+  btnConfirmarAcao: { padding: 12, borderRadius: 8, backgroundColor: theme.successAction, flex: 1, marginLeft: 10, alignItems: 'center' },
+  btnTextoBranco: { color: theme.onAction, fontWeight: 'bold', fontSize: 16 },
   
-  protocoloBox: { backgroundColor: '#f8f9fa', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#e9ecef', marginBottom: 25, alignItems: 'center' },
-  protocoloLabel: { fontSize: 14, color: '#666', marginBottom: 5 },
-  protocoloValue: { fontSize: 24, fontWeight: 'bold', color: '#007BFF', letterSpacing: 1 },
-  btnOk: { backgroundColor: '#28a745', padding: 15, borderRadius: 10, alignItems: 'center' },
-  btnOkText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  protocoloBox: { backgroundColor: theme.background, padding: 15, borderRadius: 10, borderWidth: 1, borderColor: theme.border, marginBottom: 25, alignItems: 'center' },
+  protocoloLabel: { fontSize: 14, color: theme.textSecondary, marginBottom: 5 },
+  protocoloValue: { fontSize: 24, fontWeight: 'bold', color: theme.primary, letterSpacing: 1 },
+  btnOk: { backgroundColor: theme.successAction, padding: 15, borderRadius: 10, alignItems: 'center' },
+  btnOkText: { color: theme.onAction, fontSize: 16, fontWeight: 'bold' }
 });
