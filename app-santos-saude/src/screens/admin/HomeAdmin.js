@@ -34,10 +34,7 @@ export default function HomeAdmin({ navigation }) {
     await AsyncStorage.removeItem('adminToken');
     await AsyncStorage.removeItem('adminNome');
     
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   };
 
   const primeiroNome = adminNome ? adminNome.split(' ')[0] : 'Admin';

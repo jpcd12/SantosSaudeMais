@@ -9,11 +9,7 @@ import { ThemeProvider, useAppTheme } from '@/contexts/ThemeContext';
 SplashScreen.preventAutoHideAsync();
 
 export default function TabLayout() {
-  return (
-    <ThemeProvider>
-      <ThemedTabLayout />
-    </ThemeProvider>
-  );
+  return <ThemeProvider><ThemedTabLayout /></ThemeProvider>;
 }
 
 function ThemedTabLayout() {
@@ -22,21 +18,10 @@ function ThemedTabLayout() {
   return (
     <RouterThemeProvider value={{
       ...routerTheme,
-      colors: {
-        ...routerTheme.colors,
-        background: theme.background,
-        card: theme.card,
-        text: theme.text,
-        border: theme.border,
-      },
+      colors: { ...routerTheme.colors, background: theme.background, card: theme.card, text: theme.text, border: theme.border },
     }}>
       <StatusBar style={isDark ? 'light' : 'dark'} animated />
-      {isReady ? (
-        <>
-          <AnimatedSplashOverlay />
-          <AppTabs />
-        </>
-      ) : null}
+      {isReady ? <><AnimatedSplashOverlay /><AppTabs /></> : null}
     </RouterThemeProvider>
   );
 }

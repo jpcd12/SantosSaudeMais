@@ -49,11 +49,7 @@ export default function ControlePendencias({ navigation }) {
   const renderItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.card} 
-      onPress={() => navigation.navigate('PendenciasPaciente', { 
-        paciente_id: item.id, 
-        paciente_nome: item.nome,
-        paciente_dt_nasc: item.dt_nasc
-      })}
+      onPress={() => navigation.navigate('PendenciasPaciente', { paciente_id: item.id, paciente_nome: item.nome, paciente_dt_nasc: item.dt_nasc })}
     >
       <View style={styles.cardHeader}>
         <Ionicons name="person-circle-outline" size={40} color={theme.primary} />

@@ -78,18 +78,54 @@ export default function GerenciarAgenda({ route, navigation }) {
   const mascaraHora = (valor) => valor.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1:$2').replace(/(\d{2})\d+?$/, '$1');
 
   const salvarHorario = async () => {
-    if (dataInput.length !== 10 || horaInput.length !== 5) {
-      showAlert('Atenção', 'Preencha a data e a hora nos formatos corretos.');
+    const correspondenciaData = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataInput);
+    if (!correspondenciaData) {
+      showAlert('Atenção', 'Informe uma data válida no formato DD/MM/AAAA.');
       return;
     }
-    const [dia, mes, ano] = dataInput.split('/');
-    const dataHoraFormatada = `${ano}-${mes}-${dia} ${horaInput}:00`;
+
+    const [, diaTexto, mesTexto, anoTexto] = correspondenciaData;
+    const dia = Number(diaTexto);
+    const mes = Number(mesTexto);
+    const ano = Number(anoTexto);
+    const dataValidacao = new Date(0);
+    dataValidacao.setFullYear(ano, mes - 1, dia);
+    dataValidacao.setHours(0, 0, 0, 0);
+    if (
+      ano < 1
+      || dataValidacao.getFullYear() !== ano
+      || dataValidacao.getMonth() !== mes - 1
+      || dataValidacao.getDate() !== dia
+    ) {
+      showAlert('Atenção', 'Informe uma data válida no formato DD/MM/AAAA.');
+      return;
+    }
+
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(horaInput)) {
+      showAlert('Atenção', 'Informe um horário válido no formato HH:MM (00:00 a 23:59).');
+      return;
+    }
+
+    const dataHoraFormatada = `${anoTexto}-${mesTexto}-${diaTexto} ${horaInput}:00`;
+    const capacidade = Number(capacidadeInput);
+    if (!/^\d+$/.test(capacidadeInput) || !Number.isSafeInteger(capacidade) || capacidade <= 0) {
+      showAlert('Atenção', 'A capacidade deve ser um número inteiro positivo.');
+      return;
+    }
+
+    const [horas, minutos] = horaInput.split(':').map(Number);
+    const dataHoraLocal = new Date(dataValidacao.getTime());
+    dataHoraLocal.setHours(horas, minutos, 0, 0);
+    if (dataHoraLocal.getTime() <= Date.now()) {
+      showAlert('Atenção', 'O horário deve ser futuro.');
+      return;
+    }
 
     try {
       const response = await api.post('/admin/cadastrar_agenda.php', {
         servico_id: servico_id,
         data_hora: dataHoraFormatada,
-        capacidade: parseInt(capacidadeInput) || 1
+        capacidade
       });
       if (response.data && response.data.sucesso) {
         showAlert('Sucesso', 'Horário cadastrado!');

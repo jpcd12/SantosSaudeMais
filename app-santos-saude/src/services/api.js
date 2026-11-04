@@ -1,8 +1,46 @@
 import { create } from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { showGlobalAlert } from '../contexts/ThemeContext';
 
+const ANDROID_EMULATOR_API_URL = 'http://10.0.2.2/santos-saude-api/api';
+const API_PATH = '/santos-saude-api/api';
+
+function getPrivateLanHost(hostUri) {
+  const match = hostUri?.match(/^((?:\d{1,3}\.){3}\d{1,3})(?::\d+)?$/);
+  if (!match) return null;
+
+  const octets = match[1].split('.').map(Number);
+  if (octets.some((octet) => octet < 0 || octet > 255)) return null;
+
+  const [first, second] = octets;
+  const isPrivateLanAddress =
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168);
+
+  return isPrivateLanAddress ? match[1] : null;
+}
+
+function getApiBaseUrl() {
+  const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+
+  // Expo CLI embeds its LAN host in expoConfig while a development session is active.
+  // Only use it on iOS development builds and only when it is a private IPv4 address.
+  if (Platform.OS === 'ios' && __DEV__) {
+    const host = getPrivateLanHost(Constants.expoConfig?.hostUri);
+    if (host) return `http://${host}${API_PATH}`;
+  }
+
+  // 10.0.2.2 is the host machine alias for the Android emulator.
+  if (Platform.OS === 'android') return ANDROID_EMULATOR_API_URL;
+
+  return undefined;
+}
+
 const api = create({
-  baseURL: 'http://10.0.2.2/santos-saude-api/api', 
+  baseURL: getApiBaseUrl(),
   timeout: 10000, // Cancela a requisição automaticamente após 10 segundos
 });
 

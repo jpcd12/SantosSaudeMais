@@ -46,7 +46,7 @@ export default function LoginAdmin({ navigation }) {
         <Text style={styles.title}>Acesso Restrito</Text>
         <Text style={styles.subtitle}>Painel do Administrador</Text>
         
-        <TouchableOpacity style={styles.btnVoltar} onPress={() => navigation.navigate('Login')}>
+        <TouchableOpacity style={styles.btnVoltar} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
           <Ionicons name="arrow-back" size={18} color={theme.primary} />
           <Text style={styles.textoVoltar}>Voltar para o Portal do Paciente</Text>
         </TouchableOpacity>

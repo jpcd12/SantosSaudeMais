@@ -56,12 +56,7 @@ export default function AgendarPendencia({ navigation }) {
           accessibilityLabel={`${item.servico_nome}, ${item.servico_tipo}. ${textoStatus}`}
           accessibilityHint={temVaga ? 'Abre a escolha de data e horário.' : undefined}
           onPress={() => {
-            navigation.navigate('SelecaoHorario', { 
-              servico_id: item.servico_id, 
-              pendencia_id: item.pendencia_id,
-              servico_nome: item.servico_nome,
-              servico_tipo: item.servico_tipo 
-            });
+            navigation.navigate('SelecaoHorario', { servico_id: item.servico_id, pendencia_id: item.pendencia_id, servico_nome: item.servico_nome, servico_tipo: item.servico_tipo });
           }}
       >
         <View style={styles.cardHeader}>

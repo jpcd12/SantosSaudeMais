@@ -132,9 +132,26 @@ export default function SelecaoHorario({ route, navigation }) {
         showAlert('Erro', response.data.erro);
       }
     } catch (error) {
-      const mensagemErro = error.response?.data?.erro || `Erro Técnico: ${error.message}`;
+      const status = error.response?.status;
+      const mensagemErro = error.response?.data?.erro || 'Falha ao conectar com o servidor.';
+
+      if (status === 409) {
+        showAlert('Agendamento não realizado', mensagemErro);
+
+        // Atualiza a lista caso a vaga tenha sido ocupada por outro paciente.
+        try {
+          const responseAtualizada = await api.get(`/paciente/agenda.php?servico_id=${servico_id}`);
+          if (responseAtualizada.data?.sucesso) {
+            agruparHorarios(responseAtualizada.data.horarios);
+          }
+        } catch {
+          // A confirmação já foi recusada; a falha na atualização não altera esse resultado.
+        }
+        return;
+      }
+
       showAlert('Erro no Servidor', mensagemErro);
-      console.error("Detalhes:", error);
+      console.error('Detalhes:', error);
     }
   };
 
